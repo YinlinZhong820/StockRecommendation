@@ -45,8 +45,6 @@ public class ComputeIndicator implements PairFunction<Tuple2<String, Iterable<St
             }
         }
 
-        if (prices.size() < 251) return null;
-
         filtered.sort((p1, p2) -> {
             if (p1.getYear() != p2.getYear())
                 return Integer.compare(p1.getYear(), p2.getYear());

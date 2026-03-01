@@ -139,30 +139,42 @@ public static void main(String[] args) throws InterruptedException {
     	//----------------------------------------
     	// Student's solution starts here
     	//----------------------------------------
-		// transformation
-		//		priceRDD
-		//    ↓ mapToPair
-		//    ↓ groupByKey           ← 第一次 shuffle
-		//    ↓ computeFeatures
-		//    ↓ join metadata        ← 第二次 shuffle
-		//    ↓ filter volatility
-		//    ↓ filter PE ratio
-		//    ↓ map to Asset
-		//    ↓ takeOrdered(5)
 
+		//----------------------------------------
+		// Convert Dataset to RDD
+		//----------------------------------------
 		JavaRDD<StockPrice> priceRDD = prices.javaRDD();
+
+		//----------------------------------------
+		// Filter AssetMetadata that has null sector, industry and pe ratio
+		//----------------------------------------
 		JavaPairRDD<String, AssetMetadata> filterMetadata = assetMetadata
 				.filter(new NullPeRatioFilter());
+
+		//----------------------------------------
+		//    1. Step1: map price to <ticker, StockPrice>
+		//    2. Step2: groupByKey ticker - shuffle
+		//    3. Step3: sort StockPrice by date
+		//    			compute technical indicators(AssetFeatures)
+		//    4. Step4: Filter AssetFeatures with volatilityCeiling
+		//    5. Step5: Join AssetFeatures with AssetMetadata for the pe ratio
+		//    6. Step6: Filter Join Output with PE ratio
+		//    7. Step7: Map the Filter Output to Asset(Data Construction)
+		//----------------------------------------
 
 		JavaRDD<Asset> assets = priceRDD
 				.mapToPair(new PriceToTickerPair())
 				.groupByKey()
 				.mapToPair(new ComputeIndicator(datasetEndDate))
-				.filter(Objects::nonNull)
 				.filter(new VolatilityFilter(volatilityCeiling))
 				.join(filterMetadata)
 				.filter(new PeRatioFilter(peRatioThreshold))
 				.map(new AssetBuilder());
+
+		//----------------------------------------
+		// Rank the assets based on returns
+		// Return the top 5
+		//----------------------------------------
 
 		List<Asset> top5 = assets.takeOrdered(5, new AssetReturnComparator());
 
